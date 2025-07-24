@@ -1,27 +1,54 @@
-name: documentation
+name: Deploy Sphinx documentation to Pages
 
-on: [push, pull_request, workflow_dispatch]
-
-permissions:
-  contents: write
+on:
+  push:
+    branches:
+      - main # ドキュメントのソースコードがあるブランチ (例: main, master)
+  workflow_dispatch: # 手動実行を許可する場合
 
 jobs:
-  docs:
+  build_and_deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11' # 使用するPythonのバージョンを指定 (例: '3.9', '3.10', '3.11')
+
       - name: Install dependencies
         run: |
-          pip install sphinx sphinx_rtd_theme myst_parser
-      - name: Sphinx build
+          python -m pip install --upgrade pip
+          pip install sphinx # Sphinxをインストール
+          # requirements.txt があれば以下も追加
+          # pip install -r requirements.txt
+
+      - name: Build Sphinx documentation
         run: |
-          sphinx-build doc _build
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          # Sphinxプロジェクトのルートディレクトリに移動
+          # 例: docsディレクトリにSphinxプロジェクトがある場合
+          # cd docs
+          sphinx-build -b html source _build/html # sourceディレクトリからHTMLをビルドし、_build/htmlに出力
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          publish_branch: main
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: _build/
-          force_orphan: true
+          path: './_build/html' # SphinxがビルドしたHTMLファイルのパスを指定
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
